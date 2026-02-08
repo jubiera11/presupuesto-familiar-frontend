@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto Familiar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .input { border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; width: 100%; }
+        .input:focus { outline: none; border-color: #3b82f6; }
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="max-w-6xl mx-auto p-4">
+        <!-- Header -->
+        <header class="card p-4 mb-6">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">💰 Presupuesto Familiar</h1>
+                <div class="flex gap-2 items-center">
+                    <select id="yearSelect" class="input w-32" onchange="loadYear()">
+                    </select>
+                    <button class="btn btn-primary" onclick="createYear()">+ Nuevo Año</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="card mb-6">
+            <div class="flex border-b">
+                <button id="tabResumen" class="px-6 py-3 font-medium tab-active" onclick="showTab('resumen')">📊 Resumen Anual</button>
+                <button id="tabMeses" class="px-6 py-3 font-medium text-gray-500" onclick="showTab('meses')">📅 Por Mes</button>
+                <button id="tabConfig" class="px-6 py-3 font-medium text-gray-500" onclick="showTab('config')">⚙️ Configuración</button>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div id="loading" class="card p-8 text-center">
+            <div class="loader"></div>
+            <p class="text-gray-500 mt-4">Cargando datos...</p>
+        </div>
+
+        <!-- Resumen Anual -->
+        <div id="resumenTab" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="card p-4 text-center">
+                    <p class="text-gray-500 text-sm">Ingresos Totales</p>
+                    <p id="totalIncome" class="text-2xl font-bold positive">$0</p>
+                </div>
+                <div class="card p-4 text-center">
+                    <p class="text-gray-500 text-sm">Gastos Totales</p>
+                    <p id="totalExpenses" class="text-2xl font-bold negative">$0</p>
+                </div>
+                <div class="card p-4 text-center">
+                    <p class="text-gray-500 text-sm">Ahorro Total</p>
+                    <p id="totalSavings" class="text-2xl font-bold">$0</p>
+                </div>
+                <div class="card p-4 text-center">
+                    <p class="text-gray-500 text-sm">Meses Registrados</p>
+                    <p id="monthsTracked" class="text-2xl font-bold text-blue-600">0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-4">
+                    <h3 class="font-bold mb-4">📈 Evolución Mensual</h3>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+                <div class="card p-4">
+                    <h3 class="font-bold mb-4">🥧 Distribución de Gastos</h3>
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Por Mes -->
+        <div id="mesesTab" class="hidden">
+            <div class="flex gap-2 mb-4 flex-wrap">
+                <button id="mes1" class="btn" onclick="selectMonth(1)">Enero</button>
+                <button id="mes2" class="btn" onclick="selectMonth(2)">Febrero</button>
+                <button id="mes3" class="btn" onclick="selectMonth(3)">Marzo</button>
+                <button id="mes4" class="btn" onclick="selectMonth(4)">Abril</button>
+                <button id="mes5" class="btn" onclick="selectMonth(5)">Mayo</button>
+                <button id="mes6" class="btn" onclick="selectMonth(6)">Junio</button>
+                <button id="mes7" class="btn" onclick="selectMonth(7)">Julio</button>
+                <button id="mes8" class="btn" onclick="selectMonth(8)">Agosto</button>
+                <button id="mes9" class="btn" onclick="selectMonth(9)">Septiembre</button>
+                <button id="mes10" class="btn" onclick="selectMonth(10)">Octubre</button>
+                <button id="mes11" class="btn" onclick="selectMonth(11)">Noviembre</button>
+                <button id="mes12" class="btn" onclick="selectMonth(12)">Diciembre</button>
+            </div>
+            <div id="monthContent" class="card p-6">
+                <p class="text-gray-500 text-center">Selecciona un mes para ver/editar los datos</p>
+            </div>
+        </div>
+
+        <!-- Configuración -->
+        <div id="configTab" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-6">
+                    <h3 class="font-bold mb-4">👥 Miembros de la Familia</h3>
+                    <div id="membersList"></div>
+                    <div class="flex gap-2 mt-4">
+                        <input id="newMemberName" class="input" placeholder="Nombre">
+                        <input id="newMemberPercent" class="input w-24" type="number" placeholder="%" min="0" max="100">
+                        <button class="btn btn-success" onclick="addMember()">+</button>
+                    </div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="font-bold mb-4">📁 Categorías de Gastos</h3>
+                    <div id="categoriesList"></div>
+                    <div class="flex gap-2 mt-4">
+                        <input id="newCategoryName" class="input" placeholder="Nombre de categoría">
+                        <button class="btn btn-success" onclick="addCategory()">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6 mt-6">
+                <h3 class="font-bold mb-4">🗃️ Acciones</h3>
+                <div class="flex gap-4 flex-wrap">
+                    <button class="btn btn-primary" onclick="loadSampleData()">📊 Cargar Datos de Ejemplo</button>
+                    <button class="btn btn-success" onclick="exportExcel()">📥 Exportar a Excel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://presupuesto-familiar-backend-production.up.railway.app/api';
+        let currentYear = new Date().getFullYear();
+        let currentMonth = null;
+        let familyConfig = null;
+        let annualData = null;
+        let monthlyChart = null;
+        let expenseChart = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            initYearSelect();
+            await loadConfig();
+            await loadYear();
+        });
+
+        function initYearSelect() {
+            const select = document.getElementById('yearSelect');
+            for (let y = 2020; y <= 2034; y++) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y === currentYear) opt.selected = true;
+                select.appendChild(opt);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch(`${API_URL}/family-config`);
+                familyConfig = await res.json();
+                renderConfig();
+            } catch (e) {
+                console.error('Error loading config:', e);
+            }
+        }
+
+        async function loadYear() {
+            currentYear = parseInt(document.getElementById('yearSelect').value);
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('resumenTab').classList.add('hidden');
+            
+            try {
+                const res = await fetch(`${API_URL}/annual-summary/${currentYear}`);
+                if (res.ok) {
+                    annualData = await res.json();
+                    renderAnnualSummary();
+                } else {
+                    annualData = null;
+                    renderEmptyYear();
+                }
+            } catch (e) {
+                console.error('Error loading year:', e);
+                renderEmptyYear();
+            }
+            
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('resumenTab').classList.remove('hidden');
+        }
+
+        function renderAnnualSummary() {
+            if (!annualData) return renderEmptyYear();
+            
+            document.getElementById('totalIncome').textContent = formatMoney(annualData.total_income);
+            document.getElementById('totalExpenses').textContent = formatMoney(annualData.total_expenses);
+            document.getElementById('totalSavings').textContent = formatMoney(annualData.total_savings);
+            document.getElementById('totalSavings').className = `text-2xl font-bold ${annualData.total_savings >= 0 ? 'positive' : 'negative'}`;
+            document.getElementById('monthsTracked').textContent = annualData.savings_projection?.months_tracked || 0;
+            
+            renderCharts();
+        }
+
+        function renderEmptyYear() {
+            document.getElementById('totalIncome').textContent = '$0';
+            document.getElementById('totalExpenses').textContent = '$0';
+            document.getElementById('totalSavings').textContent = '$0';
+            document.getElementById('monthsTracked').textContent = '0';
+            
+            if (monthlyChart) monthlyChart.destroy();
+            if (expenseChart) expenseChart.destroy();
+        }
+
+        function renderCharts() {
+            if (!annualData?.monthly_data) return;
+            
+            const months = annualData.monthly_data.map(m => m.month_name);
+            const incomes = annualData.monthly_data.map(m => m.income);
+            const expenses = annualData.monthly_data.map(m => m.expenses);
+            const savings = annualData.monthly_data.map(m => m.savings);
+
+            if (monthlyChart) monthlyChart.destroy();
+            monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        { label: 'Ingresos', data: incomes, backgroundColor: '#10b981' },
+                        { label: 'Gastos', data: expenses, backgroundColor: '#ef4444' },
+                        { label: 'Ahorro', data: savings, backgroundColor: '#3b82f6' }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+
+            const expenseLabels = Object.keys(annualData.expense_by_category || {});
+            const expenseValues = Object.values(annualData.expense_by_category || {});
+            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+            if (expenseChart) expenseChart.destroy();
+            expenseChart = new Chart(document.getElementById('expenseChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: expenseLabels,
+                    datasets: [{ data: expenseValues, backgroundColor: colors }]
+                },
+                options: { responsive: true }
+            });
+        }
+
+        function renderConfig() {
+            if (!familyConfig) return;
+            
+            const membersList = document.getElementById('membersList');
+            membersList.innerHTML = familyConfig.members?.map(m => `
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span>${m.name}</span>
+                    <span class="text-blue-600 font-medium">${m.percentage}%</span>
+                </div>
+            `).join('') || '<p class="text-gray-500">No hay miembros configurados</p>';
+
+            const categoriesList = document.getElementById('categoriesList');
+            categoriesList.innerHTML = familyConfig.categories?.map(c => `
+                <div class="flex justify-between items-center py-2 border-b">
+                    <span>${c.name}</span>
+                    <span class="w-4 h-4 rounded" style="background:${c.color}"></span>
+                </div>
+            `).join('') || '<p class="text-gray-500">No hay categorías configuradas</p>';
+        }
+
+        function showTab(tab) {
+            ['resumen', 'meses', 'config'].forEach(t => {
+                document.getElementById(`${t}Tab`).classList.add('hidden');
+                document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.remove('tab-active');
+                document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.add('text-gray-500');
+            });
+            document.getElementById(`${tab}Tab`).classList.remove('hidden');
+            document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('tab-active');
+            document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('text-gray-500');
+        }
+
+        async function selectMonth(month) {
+            currentMonth = month;
+            for (let i = 1; i <= 12; i++) {
+                document.getElementById(`mes${i}`).classList.remove('btn-primary');
+            }
+            document.getElementById(`mes${month}`).classList.add('btn-primary');
+            
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const content = document.getElementById('monthContent');
+            content.innerHTML = '<div class="loader"></div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/months/${currentYear}/${month}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    renderMonthEditor(data, monthNames[month - 1]);
+                } else {
+                    content.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-gray-500 mb-4">No hay datos para ${monthNames[month - 1]} ${currentYear}</p>
+                            <button class="btn btn-primary" onclick="createMonth(${month}, '${monthNames[month - 1]}')">Crear Mes</button>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                content.innerHTML = '<p class="text-red-500">Error al cargar el mes</p>';
+            }
+        }
+
+        function renderMonthEditor(data, monthName) {
+            const totalIncome = Object.values(data.income || {}).reduce((a, b) => a + b, 0);
+            const totalFixed = (data.fixed_expenses || []).reduce((a, e) => a + (e.actual || 0), 0);
+            const totalVariable = (data.variable_expenses || []).reduce((a, e) => a + (e.actual || 0), 0);
+            const totalExpenses = totalFixed + totalVariable;
+            const savings = totalIncome - totalExpenses;
+
+            document.getElementById('monthContent').innerHTML = `
+                <h3 class="text-xl font-bold mb-4">${monthName} ${currentYear}</h3>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Ingresos</p>
+                        <p class="text-lg font-bold positive">${formatMoney(totalIncome)}</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Gastos</p>
+                        <p class="text-lg font-bold negative">${formatMoney(totalExpenses)}</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Ahorro</p>
+                        <p class="text-lg font-bold ${savings >= 0 ? 'positive' : 'negative'}">${formatMoney(savings)}</p>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-bold mb-2">💵 Ingresos por Miembro</h4>
+                    ${familyConfig?.members?.map(m => `
+                        <div class="flex items-center gap-2 mb-2">
+                            <label class="w-24">${m.name}:</label>
+                            <input type="number" class="input" value="${data.income?.[m.id] || 0}" 
+                                onchange="updateIncome('${m.id}', this.value)" placeholder="0">
+                        </div>
+                    `).join('') || '<p class="text-gray-500">Configura los miembros primero</p>'}
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-bold mb-2">📌 Gastos Fijos</h4>
+                    <div id="fixedExpenses">
+                        ${(data.fixed_expenses || []).map((e, i) => `
+                            <div class="grid grid-cols-4 gap-2 mb-2">
+                                <input class="input" value="${e.name}" placeholder="Nombre" data-fixed-index="${i}" data-field="name">
+                                <input type="number" class="input" value="${e.budget || 0}" placeholder="Presupuesto" data-fixed-index="${i}" data-field="budget">
+                                <input type="number" class="input" value="${e.actual || 0}" placeholder="Real" data-fixed-index="${i}" data-field="actual">
+                                <span class="${(e.actual || 0) > (e.budget || 0) ? 'negative' : 'positive'} font-medium self-center">${(e.actual || 0) <= (e.budget || 0) ? '✓' : '⚠️'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-success mt-2" onclick="addFixedExpense()">+ Agregar Gasto Fijo</button>
+                </div>
+                
+                <div class="mb-6">
+                    <h4 class="font-bold mb-2">📊 Gastos Variables</h4>
+                    <div id="variableExpenses">
+                        ${(data.variable_expenses || []).map((e, i) => `
+                            <div class="grid grid-cols-4 gap-2 mb-2">
+                                <input class="input" value="${e.name}" placeholder="Nombre" data-var-index="${i}" data-field="name">
+                                <input type="number" class="input" value="${e.budget || 0}" placeholder="Presupuesto" data-var-index="${i}" data-field="budget">
+                                <input type="number" class="input" value="${e.actual || 0}" placeholder="Real" data-var-index="${i}" data-field="actual">
+                                <span class="${(e.actual || 0) > (e.budget || 0) ? 'negative' : 'positive'} font-medium self-center">${(e.actual || 0) <= (e.budget || 0) ? '✓' : '⚠️'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-success mt-2" onclick="addVariableExpense()">+ Agregar Gasto Variable</button>
+                </div>
+                
+                <button class="btn btn-primary w-full" onclick="saveMonth()">💾 Guardar Cambios</button>
+            `;
+            
+            window.currentMonthData = data;
+        }
+
+        async function updateIncome(memberId, value) {
+            if (!window.currentMonthData) return;
+            if (!window.currentMonthData.income) window.currentMonthData.income = {};
+            window.currentMonthData.income[memberId] = parseFloat(value) || 0;
+        }
+
+        function addFixedExpense() {
+            if (!window.currentMonthData.fixed_expenses) window.currentMonthData.fixed_expenses = [];
+            window.currentMonthData.fixed_expenses.push({ name: '', budget: 0, actual: 0 });
+            selectMonth(currentMonth);
+        }
+
+        function addVariableExpense() {
+            if (!window.currentMonthData.variable_expenses) window.currentMonthData.variable_expenses = [];
+            window.currentMonthData.variable_expenses.push({ name: '', budget: 0, actual: 0 });
+            selectMonth(currentMonth);
+        }
+
+        async function saveMonth() {
+            // Collect data from inputs
+            document.querySelectorAll('[data-fixed-index]').forEach(input => {
+                const idx = parseInt(input.dataset.fixedIndex);
+                const field = input.dataset.field;
+                if (!window.currentMonthData.fixed_expenses[idx]) window.currentMonthData.fixed_expenses[idx] = {};
+                window.currentMonthData.fixed_expenses[idx][field] = field === 'name' ? input.value : parseFloat(input.value) || 0;
+            });
+            
+            document.querySelectorAll('[data-var-index]').forEach(input => {
+                const idx = parseInt(input.dataset.varIndex);
+                const field = input.dataset.field;
+                if (!window.currentMonthData.variable_expenses[idx]) window.currentMonthData.variable_expenses[idx] = {};
+                window.currentMonthData.variable_expenses[idx][field] = field === 'name' ? input.value : parseFloat(input.value) || 0;
+            });
+
+            try {
+                await fetch(`${API_URL}/months/${currentYear}/${currentMonth}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        income: window.currentMonthData.income,
+                        fixed_expenses: window.currentMonthData.fixed_expenses,
+                        variable_expenses: window.currentMonthData.variable_expenses
+                    })
+                });
+                alert('✅ Guardado correctamente');
+                loadYear();
+            } catch (e) {
+                alert('❌ Error al guardar');
+            }
+        }
+
+        async function createMonth(month, monthName) {
+            try {
+                await fetch(`${API_URL}/months`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        year: currentYear,
+                        month: month,
+                        month_name: monthName,
+                        income: {},
+                        fixed_expenses: [],
+                        variable_expenses: []
+                    })
+                });
+                selectMonth(month);
+            } catch (e) {
+                alert('Error al crear el mes');
+            }
+        }
+
+        async function createYear() {
+            const year = prompt('¿Qué año quieres crear?', currentYear);
+            if (!year) return;
+            
+            try {
+                await fetch(`${API_URL}/create-year/${year}`, { method: 'POST' });
+                document.getElementById('yearSelect').value = year;
+                loadYear();
+                alert(`✅ Año ${year} creado`);
+            } catch (e) {
+                alert('Error al crear el año');
+            }
+        }
+
+        async function addMember() {
+            const name = document.getElementById('newMemberName').value;
+            const percentage = parseFloat(document.getElementById('newMemberPercent').value);
+            if (!name || !percentage) return alert('Completa nombre y porcentaje');
+            
+            try {
+                await fetch(`${API_URL}/family-config/member?name=${encodeURIComponent(name)}&percentage=${percentage}`, { method: 'POST' });
+                document.getElementById('newMemberName').value = '';
+                document.getElementById('newMemberPercent').value = '';
+                loadConfig();
+            } catch (e) {
+                alert('Error al agregar miembro');
+            }
+        }
+
+        async function addCategory() {
+            const name = document.getElementById('newCategoryName').value;
+            if (!name) return alert('Escribe un nombre');
+            
+            try {
+                await fetch(`${API_URL}/family-config/category?name=${encodeURIComponent(name)}`, { method: 'POST' });
+                document.getElementById('newCategoryName').value = '';
+                loadConfig();
+            } catch (e) {
+                alert('Error al agregar categoría');
+            }
+        }
+
+        async function loadSampleData() {
+            if (!confirm('¿Cargar datos de ejemplo para 2024?')) return;
+            try {
+                await fetch(`${API_URL}/seed-sample-data`, { method: 'POST' });
+                document.getElementById('yearSelect').value = 2024;
+                loadYear();
+                alert('✅ Datos de ejemplo cargados');
+            } catch (e) {
+                alert('Error al cargar datos');
+            }
+        }
+
+        async function exportExcel() {
+            window.open(`${API_URL}/export-excel/${currentYear}`, '_blank');
+        }
+
+        function formatMoney(value) {
+            return '$' + (value || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+    </script>
+</body>
+</html>
